@@ -1,0 +1,206 @@
+<div class="registration-container">
+  <!-- Success Screen -->
+  <div class="success-screen" *ngIf="showSuccessScreen">
+    <div class="success-content">
+      <div class="success-icon">
+        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" fill="#4CAF50"/>
+          <path d="M9 12l2 2 4-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+      </div>
+      
+      <h1>Form Submitted Successfully!</h1>
+      
+      <div class="success-message">
+        <p>Thank you for your registration. Your application has been received and is being processed.</p>
+        <p class="application-id" *ngIf="submitMessage">{{submitMessage}}</p>
+      </div>
+      
+      <div class="contact-info">
+        <p>For any changes or queries, please contact:</p>
+        <p class="email-contact">
+          <strong>📧 kncci@example.com</strong>
+        </p>
+      </div>
+      
+      <div class="processing-info">
+        <p class="tat-info">⏱️ Processing time: 3-5 business days</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Registration Form -->
+  <div class="registration-form" *ngIf="!showSuccessScreen"></div>
+    <div class="header">
+      <div class="logo">
+        <img src="assets/images/image.png" alt="KNNCI Logo" class="logo-img">
+      </div>
+      <div class="header-text">
+        <h1>KNCCI Academy Registration</h1>
+        <p>Please fill in your details below</p>
+        <p class="tat-info">Processing time: 3-5 business days</p>
+      </div>
+    </div>
+
+    <form (ngSubmit)="onSubmit()" #registrationForm="ngForm">
+      <div class="form-group">
+        <label for="name">Name *</label>
+        <input 
+          type="text" 
+          id="name" 
+          name="name"
+          [(ngModel)]="formData.name"
+          required
+          placeholder="Enter your full name"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="email">Email *</label>
+        <input 
+          type="email" 
+          id="email" 
+          name="email"
+          [(ngModel)]="formData.email"
+          required
+          placeholder="Enter your email address"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="mobile">Mobile Number *</label>
+        <input 
+          type="tel" 
+          id="mobile" 
+          name="mobile"
+          [(ngModel)]="formData.mobile"
+          required
+          placeholder="Enter your mobile number"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="role">I am a *</label>
+        <select 
+          id="role" 
+          name="role"
+          [(ngModel)]="formData.role"
+          required
+        >
+          <option value="">Select an option</option>
+          <option *ngFor="let role of roleOptions" [value]="role">{{role}}</option>
+        </select>
+      </div>
+
+      <!-- Show qualification dropdown only for Students -->
+      <div class="form-group" *ngIf="shouldShowQualification()">
+        <label for="qualification">Highest Qualification *</label>
+        <select 
+          id="qualification" 
+          name="qualification"
+          [(ngModel)]="formData.qualification"
+          [required]="shouldShowQualification()"
+        >
+          <option value="">Select your qualification</option>
+          <option *ngFor="let qual of qualificationOptions" [value]="qual">{{qual}}</option>
+        </select>
+      </div>
+
+      <!-- Show company field only for Employees -->
+      <div class="form-group" *ngIf="shouldShowCompany()">
+        <label for="company">Company Name *</label>
+        <input 
+          type="text" 
+          id="company" 
+          name="company"
+          [(ngModel)]="formData.company"
+          [required]="shouldShowCompany()"
+          placeholder="Enter your company name"
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="dateOfBirth">Date of Birth *</label>
+        <input 
+          type="date" 
+          id="dateOfBirth" 
+          name="dateOfBirth"
+          [(ngModel)]="formData.dateOfBirth"
+          required
+        >
+      </div>
+
+      <div class="form-group">
+        <label for="appointmentDate">Select Appointment Date *</label>
+        <input 
+          type="date" 
+          id="appointmentDate" 
+          name="appointmentDate"
+          [(ngModel)]="formData.appointmentDate"
+          [min]="getMinDate()"
+          (change)="onDateSelected()"
+          required
+        >
+      </div>
+
+      <div class="form-group" *ngIf="formData.appointmentSlot">
+        <label>Selected Appointment Slot</label>
+        <div class="selected-slot">
+          {{formData.appointmentSlot}}
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label for="address">Address (Optional)</label>
+        <textarea 
+          id="address" 
+          name="address"
+          [(ngModel)]="formData.address"
+          placeholder="Enter your address"
+          rows="3"
+        ></textarea>
+      </div>
+
+      <!-- Submission Status Messages -->
+      <div class="alert alert-success" *ngIf="submitSuccess && submitMessage">
+        {{submitMessage}}
+      </div>
+      
+      <div class="alert alert-error" *ngIf="!submitSuccess && submitMessage">
+        {{submitMessage}}
+      </div>
+
+      <button 
+        type="submit" 
+        class="submit-btn" 
+        [disabled]="!registrationForm.form.valid || isSubmitting"
+      >
+        <span *ngIf="isSubmitting">Submitting...</span>
+        <span *ngIf="!isSubmitting">Submit Registration</span>
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- Time Slot Selection Modal -->
+<div class="modal-overlay" *ngIf="showTimeSlotModal" (click)="closeTimeSlotModal()">
+  <div class="time-slot-modal" (click)="$event.stopPropagation()">
+    <div class="modal-header">
+      <button class="close-btn" (click)="closeTimeSlotModal()">×</button>
+      <div class="back-btn" (click)="closeTimeSlotModal()">
+        <span>←</span>
+      </div>
+      <h3>Available Time Slots for {{selectedDateFormatted}}</h3>
+    </div>
+    
+    <div class="time-slots-container">
+      <div 
+        class="time-slot-card" 
+        *ngFor="let slot of timeSlots"
+        (click)="selectTimeSlot(slot)"
+      >
+        {{slot}}
+      </div>
+    </div>
+  </div>
+</div>
