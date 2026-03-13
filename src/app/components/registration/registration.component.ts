@@ -1,39 +1,16 @@
-import { Component } from '@angular/core';
-import { CommonModule } from '@angular/common';
+import { Component, ChangeDetectorRef, Inject, PLATFORM_ID } from '@angular/core';
+import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { HttpClient, HttpClientModule } from '@angular/common/http';
-
-interface RegistrationRequest {
-  name: string;
-  email: string;
-  mobile: string;
-  user_type: string;
-  company_name: string | null;
-  qualification: string | null;
-  date_of_birth: string;
-  appointment_date: string;
-  slot: string;
-  address: string;
-}
-
-interface RegistrationResponse {
-  success: boolean;
-  message: string;
-  application_id: number;
-  student_id?: string;
-}
+import { ApiService, RegistrationRequest, RegistrationResponse } from '../../services/api.service';
 
 @Component({
   selector: 'app-registration',
   standalone: true,
-  imports: [CommonModule, FormsModule, HttpClientModule],
+  imports: [CommonModule, FormsModule],
   templateUrl: './registration.component.html',
   styleUrl: './registration.component.css'
 })
 export class RegistrationComponent {
-  // API endpoint - update this to your actual API URL
-  private apiUrl = 'http://localhost:8000/api/register'; // Change this to your API URL
-
   formData = {
     name: '',
     email: '',
@@ -80,108 +57,193 @@ export class RegistrationComponent {
   submitSuccess = false;
   showSuccessScreen = false;
   
-  constructor(private http: HttpClient) {}
+  // Check if user already submitted
+  alreadySubmitted = false;
+  isCheckingExisting = false;
+  existingApplication: any = null;
+  
+  // Email check timeout
+  private emailCheckTimeout: any;
+  
+  constructor(
+    private apiService: ApiService,
+    private cdr: ChangeDetectorRef,
+    @Inject(PLATFORM_ID) private platformId: Object
+  ) {
+    // Only check localStorage if we're in the browser
+    if (isPlatformBrowser(this.platformId)) {
+      this.checkIfAlreadySubmitted();
+    }
+  }
+
+  // Check on page load if user has already submitted (localStorage + API)
+  private checkIfAlreadySubmitted(): void {
+    // Only check localStorage in browser environment
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+
+    // First check localStorage for quick response
+    const submittedData = localStorage.getItem('knnci_registration_submitted');
+    if (submittedData) {
+      const submission = JSON.parse(submittedData);
+      console.log('Found localStorage submission:', submission);
+      
+      // Verify with API that this submission still exists
+      this.verifySubmissionWithAPI(submission.email);
+    }
+  }
+
+  // Verify localStorage submission with API
+  private verifySubmissionWithAPI(email: string): void {
+    this.apiService.getApplications().subscribe({
+      next: (applications: any[]) => {
+        const existingApp = applications.find((app: any) => 
+          app.email && app.email.toLowerCase() === email.toLowerCase()
+        );
+
+        if (existingApp) {
+          // Confirmed: submission exists in API
+          this.alreadySubmitted = true;
+          this.showSuccessScreen = true;
+          this.submitMessage = `Registration already exists! Application ID: ${existingApp.id}`;
+          console.log('Confirmed existing submission via API');
+        } else {
+          // Submission not found in API, clear localStorage
+          if (isPlatformBrowser(this.platformId)) {
+            localStorage.removeItem('knnci_registration_submitted');
+          }
+          console.log('Submission not found in API, cleared localStorage');
+        }
+        this.cdr.detectChanges();
+      },
+      error: (error: any) => {
+        console.error('Error verifying submission:', error);
+        // On API error, trust localStorage for now
+        if (isPlatformBrowser(this.platformId)) {
+          const submittedData = localStorage.getItem('knnci_registration_submitted');
+          if (submittedData) {
+            const submission = JSON.parse(submittedData);
+            this.alreadySubmitted = true;
+            this.showSuccessScreen = true;
+            this.submitMessage = `Registration already submitted! Application ID: ${submission.applicationId}`;
+          }
+        }
+        this.cdr.detectChanges();
+      }
+    });
+  }
   
   async onSubmit() {
     if (this.isSubmitting) return;
     
+    // Check if email already exists before submitting
+    if (this.alreadySubmitted) {
+      this.submitMessage = 'This email is already registered. Please use a different email address.';
+      this.submitSuccess = false;
+      return;
+    }
+    
     this.isSubmitting = true;
     this.submitMessage = '';
+    this.submitSuccess = false;
     
-    // Validate required fields
-    if (!this.formData.name || !this.formData.email || !this.formData.mobile || 
-        !this.formData.role || !this.formData.dateOfBirth || 
-        !this.formData.appointmentDate || !this.formData.appointmentSlot) {
-      this.submitMessage = 'Please fill in all required fields';
-      this.isSubmitting = false;
-      return;
-    }
-
-    // Additional validation for conditional fields
-    if (this.formData.role === 'Student' && !this.formData.qualification) {
-      this.submitMessage = 'Please select your qualification';
-      this.isSubmitting = false;
-      return;
-    }
-    
-    if (this.formData.role === 'Employee' && !this.formData.company) {
-      this.submitMessage = 'Please enter your company name';
-      this.isSubmitting = false;
-      return;
-    }
-    
-    // Note: Unemployed and Exploring options don't need additional fields
-
-    // Map form data to API format - match backend UserRegistration model exactly
-    const registrationData: RegistrationRequest = {
-      name: this.formData.name.trim(),
-      email: this.formData.email.trim().toLowerCase(),
-      mobile: this.formData.mobile.trim(),
-      user_type: this.mapRoleToUserType(this.formData.role),
-      date_of_birth: this.formData.dateOfBirth,
-      appointment_date: this.formData.appointmentDate,
-      slot: this.extractTimeSlot(this.formData.appointmentSlot),
-      address: this.formData.address?.trim() || "",
-      company_name: this.formData.role === 'Employee' ? (this.formData.company?.trim() || "") : "",
-      qualification: this.formData.role === 'Student' ? (this.formData.qualification || "") : ""
-    };
-
-    // Log the data being sent for debugging
-    console.log('Sending registration data:');
-    console.log(JSON.stringify(registrationData, null, 2));
-
-    // Make API call
-    this.http.post<RegistrationResponse>(this.apiUrl, registrationData).subscribe({
-      next: (response) => {
-        console.log('API Response received:', response);
-        if (response?.success) {
-          console.log('Registration successful, showing success screen');
-          this.submitSuccess = true;
-          this.showSuccessScreen = true;
-          let message = 'Registration successful!';
-          if (response.application_id) {
-            message += ` Application ID: ${response.application_id}`;
-          }
-          if (response.student_id) {
-            message += ` Student ID: ${response.student_id}`;
-          }
-          this.submitMessage = message;
-          console.log('Success screen should now be visible:', this.showSuccessScreen);
-        } else {
-          this.submitSuccess = false;
-          this.submitMessage = response?.message || 'Registration failed. Please try again.';
-        }
-        this.isSubmitting = false;
-      },
-      error: (error) => {
-        console.log('API Error received:', error);
-        this.submitSuccess = false;
-        this.isSubmitting = false;
-        
-        if (error.status === 422) {
-          console.log('422 Error details:', error.error);
-          if (error.error?.detail) {
-            if (Array.isArray(error.error.detail)) {
-              const errorMessages = error.error.detail.map((err: any) => {
-                const field = err.loc ? err.loc.join('.') : 'unknown field';
-                return `${field}: ${err.msg}`;
-              }).join('\n');
-              this.submitMessage = `Validation errors:\n${errorMessages}`;
-            } else {
-              this.submitMessage = `Validation error: ${error.error.detail}`;
-            }
-          } else {
-            this.submitMessage = 'Invalid data format. Please check all fields.';
-          }
-        } else if (error.status === 400 && error.error?.detail) {
-          this.submitMessage = error.error.detail;
-        } else if (error.status === 500) {
-          this.submitMessage = 'Server error. Please try again later.';
-        } else {
-          this.submitMessage = 'Registration failed. Please check your connection and try again.';
-        }
+    try {
+      // Validate required fields
+      if (!this.formData.name || !this.formData.email || !this.formData.mobile || 
+          !this.formData.role || !this.formData.dateOfBirth || 
+          !this.formData.appointmentDate || !this.formData.appointmentSlot) {
+        throw new Error('Please fill in all required fields');
       }
-    });
+
+      // Additional validation for conditional fields
+      if (this.formData.role === 'Student' && !this.formData.qualification) {
+        throw new Error('Please select your qualification');
+      }
+      
+      if (this.formData.role === 'Employee' && !this.formData.company) {
+        throw new Error('Please enter your company name');
+      }
+
+      // Map form data to API format
+      const registrationData: RegistrationRequest = {
+        name: this.formData.name.trim(),
+        email: this.formData.email.trim().toLowerCase(),
+        mobile: this.formData.mobile.trim(),
+        user_type: this.mapRoleToUserType(this.formData.role),
+        date_of_birth: this.formData.dateOfBirth,
+        appointment_date: this.formData.appointmentDate,
+        slot: this.extractTimeSlot(this.formData.appointmentSlot),
+        address: this.formData.address?.trim() || "",
+        company_name: this.formData.role === 'Employee' ? (this.formData.company?.trim() || "") : "",
+        qualification: this.formData.role === 'Student' ? (this.formData.qualification || "") : ""
+      };
+
+      console.log('Sending registration data:', registrationData);
+
+      // Make API call using the service
+      this.apiService.register(registrationData).subscribe({
+        next: (response: RegistrationResponse) => {
+          console.log('API Response received:', response);
+          this.handleSuccessfulSubmission(response);
+        },
+        error: (error: any) => {
+          console.error('Registration error:', error);
+          this.handleSubmissionError(error);
+        },
+        complete: () => {
+          this.isSubmitting = false;
+          this.cdr.detectChanges();
+        }
+      });
+      
+    } catch (error: any) {
+      console.error('Registration error:', error);
+      this.handleSubmissionError(error);
+      this.isSubmitting = false;
+      this.cdr.detectChanges();
+    }
+  }
+
+  // Handle successful submission
+  private handleSuccessfulSubmission(response: RegistrationResponse): void {
+    this.submitSuccess = true;
+    this.showSuccessScreen = true;
+    
+    let message = 'Registration successful!';
+    if (response.application_id) {
+      message += ` Application ID: ${response.application_id}`;
+    }
+    if (response.student_id) {
+      message += ` Student ID: ${response.student_id}`;
+    }
+    this.submitMessage = message;
+
+    // Save to localStorage to prevent future submissions
+    this.saveSubmissionToLocalStorage(response.application_id, response.student_id);
+    
+    // Reset form data
+    this.resetForm();
+    
+    console.log('Success screen should now be visible');
+  }
+
+  // Handle submission errors
+  private handleSubmissionError(error: any): void {
+    this.submitSuccess = false;
+    
+    if (error.userMessage) {
+      // Error from our API service
+      this.submitMessage = error.userMessage;
+    } else if (error.message && !error.status) {
+      // Validation error from our code
+      this.submitMessage = error.message;
+    } else if (error.status === 400 && error.error?.detail === 'Email already registered') {
+      this.submitMessage = 'This email is already registered. Please use a different email address.';
+      this.alreadySubmitted = true;
+    } else {
+      this.submitMessage = 'Registration failed. Please try again.';
+    }
   }
   
   // Helper method to map frontend role to backend user_type
@@ -220,6 +282,25 @@ export class RegistrationComponent {
       appointmentSlot: '',
       address: ''
     };
+  }
+
+  // Close success screen and reset to form
+  closeSuccessScreen(): void {
+    this.showSuccessScreen = false;
+    this.submitSuccess = false;
+    this.submitMessage = '';
+    this.alreadySubmitted = false;
+    this.cdr.detectChanges();
+  }
+
+  // Start new registration (clear everything)
+  startNewRegistration(): void {
+    this.closeSuccessScreen();
+    this.resetForm();
+    // Clear localStorage if needed
+    if (isPlatformBrowser(this.platformId)) {
+      localStorage.removeItem('knnci_registration_submitted');
+    }
   }
   
   // Helper method to check if qualification field should be shown
@@ -263,9 +344,65 @@ export class RegistrationComponent {
     this.showTimeSlotModal = false;
   }
 
-  // Test method to show success screen (for debugging)
-  testSuccessScreen(): void {
-    this.showSuccessScreen = true;
-    this.submitMessage = 'Test success message';
+  // Called when email field changes
+  onEmailChange(): void {
+    // Debounce the API call to avoid too many requests
+    clearTimeout(this.emailCheckTimeout);
+    this.emailCheckTimeout = setTimeout(() => {
+      this.checkExistingApplication(this.formData.email);
+    }, 1000); // Wait 1 second after user stops typing
+  }
+
+  // Check if email already exists in applications via API
+  private checkExistingApplication(email: string): void {
+    if (!email || !email.includes('@')) {
+      this.alreadySubmitted = false;
+      this.isCheckingExisting = false;
+      return;
+    }
+
+    this.isCheckingExisting = true;
+
+    this.apiService.checkEmailExists(email).subscribe({
+      next: (exists: boolean) => {
+        this.alreadySubmitted = exists;
+        this.isCheckingExisting = false;
+        this.cdr.detectChanges();
+      },
+      error: (error: any) => {
+        console.error('Error checking email:', error);
+        // On error, allow form submission (don't block user)
+        this.alreadySubmitted = false;
+        this.isCheckingExisting = false;
+        this.cdr.detectChanges();
+      }
+    });
+  }
+
+  // Go back to form from error screen
+  goBackToForm(): void {
+    this.showSuccessScreen = false;
+    this.alreadySubmitted = false;
+    this.submitSuccess = false;
+    this.submitMessage = '';
+    this.isSubmitting = false;
+    this.cdr.detectChanges();
+  }
+
+  // Save successful submission to localStorage
+  private saveSubmissionToLocalStorage(applicationId: number, studentId?: string): void {
+    // Only save to localStorage in browser environment
+    if (!isPlatformBrowser(this.platformId)) {
+      return;
+    }
+
+    const submissionData = {
+      applicationId: applicationId,
+      studentId: studentId,
+      email: this.formData.email,
+      submittedAt: new Date().toISOString()
+    };
+    localStorage.setItem('knnci_registration_submitted', JSON.stringify(submissionData));
+    console.log('Submission saved to localStorage:', submissionData);
   }
 }
