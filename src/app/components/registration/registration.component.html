@@ -30,7 +30,7 @@
   </div>
 
   <!-- Registration Form -->
-  <div class="registration-form" *ngIf="!showSuccessScreen"></div>
+  <div class="registration-form" *ngIf="!showSuccessScreen">
     <div class="header">
       <div class="logo">
         <img src="assets/images/image.png" alt="KNNCI Logo" class="logo-img">
@@ -177,6 +177,16 @@
       >
         <span *ngIf="isSubmitting">Submitting...</span>
         <span *ngIf="!isSubmitting">Submit Registration</span>
+      </button>
+
+      <!-- Temporary test button -->
+      <button 
+        type="button" 
+        class="submit-btn" 
+        (click)="testSuccessScreen()"
+        style="background: orange; margin-top: 10px;"
+      >
+        Test Success Screen
       </button>
     </form>
   </div>

@@ -88,115 +88,100 @@ export class RegistrationComponent {
     this.isSubmitting = true;
     this.submitMessage = '';
     
-    try {
-      // Validate required fields
-      if (!this.formData.name || !this.formData.email || !this.formData.mobile || 
-          !this.formData.role || !this.formData.dateOfBirth || 
-          !this.formData.appointmentDate || !this.formData.appointmentSlot) {
-        throw new Error('Please fill in all required fields');
-      }
-
-      // Additional validation for conditional fields
-      if (this.formData.role === 'Student' && !this.formData.qualification) {
-        throw new Error('Please select your qualification');
-      }
-      
-      if (this.formData.role === 'Employee' && !this.formData.company) {
-        throw new Error('Please enter your company name');
-      }
-      
-      // Note: Unemployed and Exploring options don't need additional fields
-
-      // Map form data to API format - match backend UserRegistration model exactly
-      const registrationData: RegistrationRequest = {
-        name: this.formData.name.trim(),
-        email: this.formData.email.trim().toLowerCase(),
-        mobile: this.formData.mobile.trim(),
-        user_type: this.mapRoleToUserType(this.formData.role),
-        date_of_birth: this.formData.dateOfBirth,
-        appointment_date: this.formData.appointmentDate,
-        slot: this.extractTimeSlot(this.formData.appointmentSlot),
-        address: this.formData.address?.trim() || "",
-        company_name: this.formData.role === 'Employee' ? (this.formData.company?.trim() || "") : "",
-        qualification: this.formData.role === 'Student' ? (this.formData.qualification || "") : ""
-      };
-
-      // Log the data being sent for debugging
-      console.log('Sending registration data:');
-      console.log(JSON.stringify(registrationData, null, 2));
-
-      // Make API call
-      const response = await this.http.post<RegistrationResponse>(this.apiUrl, registrationData).toPromise();
-      
-      if (response?.success) {
-        console.log('Registration successful, showing success screen');
-        this.submitSuccess = true;
-        this.showSuccessScreen = true;
-        let message = 'Registration successful!';
-        if (response.application_id) {
-          message += ` Application ID: ${response.application_id}`;
-        }
-        if (response.student_id) {
-          message += ` Student ID: ${response.student_id}`;
-        }
-        this.submitMessage = message;
-        console.log('Success screen should now be visible:', this.showSuccessScreen);
-        // Don't reset form here - show success screen instead
-      } else {
-        this.submitSuccess = false;
-        this.submitMessage = response?.message || 'Registration failed. Please try again.';
-      }
-      
-    } catch (error: any) {
-      this.submitSuccess = false;
-      console.log('Registration failed with error:', error);
-      
-      // Handle client-side validation errors
-      if (error.message && typeof error.message === 'string') {
-        this.submitMessage = error.message;
-        this.isSubmitting = false;
-        return;
-      }
-      
-      // Log the full error for debugging
-      console.error('Full registration error:');
-      console.error('Status:', error.status);
-      console.error('Error body:', error.error);
-      console.error('Complete error object:', error);
-      
-      if (error.status === 422) {
-        // Validation error - show detailed error message
-        console.log('422 Error details:');
-        console.log('Response body:', error.error);
-        console.log('Response headers:', error.headers);
-        
-        if (error.error?.detail) {
-          if (Array.isArray(error.error.detail)) {
-            // Pydantic validation errors
-            console.log('Validation errors:', error.error.detail);
-            const errorMessages = error.error.detail.map((err: any) => {
-              const field = err.loc ? err.loc.join('.') : 'unknown field';
-              return `${field}: ${err.msg}`;
-            }).join('\n');
-            this.submitMessage = `Validation errors:\n${errorMessages}`;
-          } else {
-            this.submitMessage = `Validation error: ${error.error.detail}`;
-          }
-        } else {
-          this.submitMessage = 'Invalid data format. Please check all fields.';
-        }
-      } else if (error.status === 400 && error.error?.detail) {
-        this.submitMessage = error.error.detail;
-      } else if (error.status === 500) {
-        this.submitMessage = 'Server error. Please try again later.';
-      } else {
-        this.submitMessage = 'Registration failed. Please check your connection and try again.';
-      }
-      
-    } finally {
-      console.log('Finally block - setting isSubmitting to false');
+    // Validate required fields
+    if (!this.formData.name || !this.formData.email || !this.formData.mobile || 
+        !this.formData.role || !this.formData.dateOfBirth || 
+        !this.formData.appointmentDate || !this.formData.appointmentSlot) {
+      this.submitMessage = 'Please fill in all required fields';
       this.isSubmitting = false;
+      return;
     }
+
+    // Additional validation for conditional fields
+    if (this.formData.role === 'Student' && !this.formData.qualification) {
+      this.submitMessage = 'Please select your qualification';
+      this.isSubmitting = false;
+      return;
+    }
+    
+    if (this.formData.role === 'Employee' && !this.formData.company) {
+      this.submitMessage = 'Please enter your company name';
+      this.isSubmitting = false;
+      return;
+    }
+    
+    // Note: Unemployed and Exploring options don't need additional fields
+
+    // Map form data to API format - match backend UserRegistration model exactly
+    const registrationData: RegistrationRequest = {
+      name: this.formData.name.trim(),
+      email: this.formData.email.trim().toLowerCase(),
+      mobile: this.formData.mobile.trim(),
+      user_type: this.mapRoleToUserType(this.formData.role),
+      date_of_birth: this.formData.dateOfBirth,
+      appointment_date: this.formData.appointmentDate,
+      slot: this.extractTimeSlot(this.formData.appointmentSlot),
+      address: this.formData.address?.trim() || "",
+      company_name: this.formData.role === 'Employee' ? (this.formData.company?.trim() || "") : "",
+      qualification: this.formData.role === 'Student' ? (this.formData.qualification || "") : ""
+    };
+
+    // Log the data being sent for debugging
+    console.log('Sending registration data:');
+    console.log(JSON.stringify(registrationData, null, 2));
+
+    // Make API call
+    this.http.post<RegistrationResponse>(this.apiUrl, registrationData).subscribe({
+      next: (response) => {
+        console.log('API Response received:', response);
+        if (response?.success) {
+          console.log('Registration successful, showing success screen');
+          this.submitSuccess = true;
+          this.showSuccessScreen = true;
+          let message = 'Registration successful!';
+          if (response.application_id) {
+            message += ` Application ID: ${response.application_id}`;
+          }
+          if (response.student_id) {
+            message += ` Student ID: ${response.student_id}`;
+          }
+          this.submitMessage = message;
+          console.log('Success screen should now be visible:', this.showSuccessScreen);
+        } else {
+          this.submitSuccess = false;
+          this.submitMessage = response?.message || 'Registration failed. Please try again.';
+        }
+        this.isSubmitting = false;
+      },
+      error: (error) => {
+        console.log('API Error received:', error);
+        this.submitSuccess = false;
+        this.isSubmitting = false;
+        
+        if (error.status === 422) {
+          console.log('422 Error details:', error.error);
+          if (error.error?.detail) {
+            if (Array.isArray(error.error.detail)) {
+              const errorMessages = error.error.detail.map((err: any) => {
+                const field = err.loc ? err.loc.join('.') : 'unknown field';
+                return `${field}: ${err.msg}`;
+              }).join('\n');
+              this.submitMessage = `Validation errors:\n${errorMessages}`;
+            } else {
+              this.submitMessage = `Validation error: ${error.error.detail}`;
+            }
+          } else {
+            this.submitMessage = 'Invalid data format. Please check all fields.';
+          }
+        } else if (error.status === 400 && error.error?.detail) {
+          this.submitMessage = error.error.detail;
+        } else if (error.status === 500) {
+          this.submitMessage = 'Server error. Please try again later.';
+        } else {
+          this.submitMessage = 'Registration failed. Please check your connection and try again.';
+        }
+      }
+    });
   }
   
   // Helper method to map frontend role to backend user_type
@@ -276,5 +261,11 @@ export class RegistrationComponent {
   // Close the time slot modal
   closeTimeSlotModal(): void {
     this.showTimeSlotModal = false;
+  }
+
+  // Test method to show success screen (for debugging)
+  testSuccessScreen(): void {
+    this.showSuccessScreen = true;
+    this.submitMessage = 'Test success message';
   }
 }
