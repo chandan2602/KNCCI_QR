@@ -2,6 +2,8 @@ import { Component, ChangeDetectorRef, Inject, PLATFORM_ID } from '@angular/core
 import { CommonModule, isPlatformBrowser } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ApiService, RegistrationRequest, RegistrationResponse } from '../../services/api.service';
+import { CalendarService } from '../../services/calendar.service';
+import { NotificationService } from '../../services/notification.service';
 
 @Component({
   selector: 'app-registration',
@@ -21,7 +23,8 @@ export class RegistrationComponent {
     dateOfBirth: '',
     appointmentDate: '',
     appointmentSlot: '',
-    address: ''
+    emailAcknowledgement: false,
+    whatsappAcknowledgement: false
   };
 
   roleOptions = ['Student', 'Employee', 'Unemployed', 'Exploring my options'];
@@ -64,9 +67,14 @@ export class RegistrationComponent {
   
   // Email check timeout
   private emailCheckTimeout: any;
+
+  // Loading states
+  isLoadingSlots = false;
   
   constructor(
     private apiService: ApiService,
+    private calendarService: CalendarService,
+    private notificationService: NotificationService,
     private cdr: ChangeDetectorRef,
     @Inject(PLATFORM_ID) private platformId: Object
   ) {
@@ -174,9 +182,10 @@ export class RegistrationComponent {
         date_of_birth: this.formData.dateOfBirth,
         appointment_date: this.formData.appointmentDate,
         slot: this.extractTimeSlot(this.formData.appointmentSlot),
-        address: this.formData.address?.trim() || "",
         company_name: this.formData.role === 'Employee' ? (this.formData.company?.trim() || "") : "",
-        qualification: this.formData.role === 'Student' ? (this.formData.qualification || "") : ""
+        qualification: this.formData.role === 'Student' ? (this.formData.qualification || "") : "",
+        email_acknowledgement: this.formData.emailAcknowledgement,
+        whatsapp_acknowledgement: this.formData.whatsappAcknowledgement
       };
 
       console.log('Sending registration data:', registrationData);
@@ -184,15 +193,24 @@ export class RegistrationComponent {
       // Make API call using the service
       this.apiService.register(registrationData).subscribe({
         next: (response: RegistrationResponse) => {
-          console.log('API Response received:', response);
-          this.handleSuccessfulSubmission(response);
+          console.log('✅ Registration API Success Response:', response);
+          
+          // Always show success screen if we get a response (no error thrown)
+          this.handleSuccessfulRegistration(response);
         },
         error: (error: any) => {
-          console.error('Registration error:', error);
+          console.error('❌ Registration API Error:', error);
+          console.error('Error details:', {
+            status: error.status,
+            statusText: error.statusText,
+            message: error.message,
+            error: error.error
+          });
           this.handleSubmissionError(error);
         },
         complete: () => {
           this.isSubmitting = false;
+          console.log('🔄 Registration API call completed, isSubmitting set to false');
           this.cdr.detectChanges();
         }
       });
@@ -205,27 +223,113 @@ export class RegistrationComponent {
     }
   }
 
-  // Handle successful submission
-  private handleSuccessfulSubmission(response: RegistrationResponse): void {
+  // Handle successful registration and send notifications based on user preferences
+  private handleSuccessfulRegistration(response: RegistrationResponse): void {
+    console.log('Registration successful, processing notifications...');
+    
+    // Set success state immediately
     this.submitSuccess = true;
     this.showSuccessScreen = true;
     
     let message = 'Registration successful!';
     if (response.application_id) {
-      message += ` Application ID: ${response.application_id}`;
+      message += `\nApplication ID: ${response.application_id}`;
     }
     if (response.student_id) {
-      message += ` Student ID: ${response.student_id}`;
+      message += `\nStudent ID: ${response.student_id}`;
     }
-    this.submitMessage = message;
 
-    // Save to localStorage to prevent future submissions
-    this.saveSubmissionToLocalStorage(response.application_id, response.student_id);
+    const notifications: string[] = [];
     
-    // Reset form data
+    // Calendar invitation is always sent
+    notifications.push('📅 Calendar invitation will be sent');
+    
+    // Handle email notification if checkbox is checked
+    if (this.formData.emailAcknowledgement) {
+      notifications.push('📧 Sending confirmation email...');
+      this.sendEmailNotification(response, notifications);
+    } else {
+      notifications.push('📧 Email notifications disabled');
+    }
+    
+    // Handle WhatsApp notification if checkbox is checked
+    if (this.formData.whatsappAcknowledgement) {
+      notifications.push('📱 WhatsApp notifications enabled');
+    } else {
+      notifications.push('📱 WhatsApp notifications disabled');
+    }
+
+    // Update success message with notification status
+    if (notifications.length > 0) {
+      message += '\n\n' + notifications.join('\n');
+    }
+    
+    this.submitMessage = message;
+    
+    // Save to localStorage and reset form
+    this.saveSubmissionToLocalStorage(response.application_id, response.student_id);
     this.resetForm();
     
-    console.log('Success screen should now be visible');
+    // Force UI update
+    this.cdr.detectChanges();
+    
+    console.log('Success screen is now visible:', {
+      showSuccessScreen: this.showSuccessScreen,
+      submitSuccess: this.submitSuccess,
+      message: this.submitMessage
+    });
+  }
+
+  // Send email notification using your API
+  private sendEmailNotification(response: RegistrationResponse, notifications: string[]): void {
+    const email = this.formData.email;
+    const name = this.formData.name;
+    const studentId = response.student_id;
+    
+    console.log(`Sending email notification to: ${email}`);
+    
+    // Send email in background - don't wait for response to show success screen
+    this.apiService.sendFormSubmittedEmail(email, name, studentId).subscribe({
+      next: (emailResponse: any) => {
+        console.log('Email API response:', emailResponse);
+        
+        if (emailResponse.success) {
+          console.log(`Email sent successfully to ${email}`);
+          // Update message to show email was sent
+          this.updateEmailStatus('📧 Confirmation email sent successfully');
+        } else {
+          console.error('Email sending failed:', emailResponse.message);
+          this.updateEmailStatus('📧 Email sending failed');
+        }
+      },
+      error: (error: any) => {
+        console.error('Email API error:', error);
+        this.updateEmailStatus('📧 Email sending failed');
+      }
+    });
+  }
+
+  // Update email status in the success message
+  private updateEmailStatus(newStatus: string): void {
+    if (this.submitMessage) {
+      // Replace the "Sending confirmation email..." with actual status
+      this.submitMessage = this.submitMessage.replace(
+        '📧 Sending confirmation email...',
+        newStatus
+      );
+      this.cdr.detectChanges();
+    }
+  }
+
+  // Send WhatsApp notification (placeholder for future implementation)
+  private sendWhatsAppNotification(response: RegistrationResponse, notifications: string[]): void {
+    // TODO: Implement WhatsApp API integration
+    console.log('WhatsApp notification requested but not yet implemented');
+  }
+
+  // Handle successful submission (legacy method - keeping for compatibility)
+  private handleSuccessfulSubmission(response: RegistrationResponse): void {
+    this.handleSuccessfulRegistration(response);
   }
 
   // Handle submission errors
@@ -280,7 +384,8 @@ export class RegistrationComponent {
       dateOfBirth: '',
       appointmentDate: '',
       appointmentSlot: '',
-      address: ''
+      emailAcknowledgement: false,
+      whatsappAcknowledgement: false
     };
   }
 
@@ -302,6 +407,38 @@ export class RegistrationComponent {
       localStorage.removeItem('knnci_registration_submitted');
     }
   }
+
+  // Debug method to test API connection
+  testApiConnection(): void {
+    console.log('🧪 Testing API connection...');
+    console.log('API URL:', `${this.apiService['baseUrl']}/api/register`);
+    
+    // Test with minimal data
+    const testData = {
+      name: 'Test User',
+      email: 'test@example.com',
+      mobile: '1234567890',
+      user_type: 'student',
+      company_name: null,
+      qualification: 'Test',
+      date_of_birth: '1990-01-01',
+      appointment_date: '2024-03-20',
+      slot: '10:00am - 11:00am',
+      email_acknowledgement: false,
+      whatsapp_acknowledgement: false
+    };
+    
+    this.apiService.register(testData).subscribe({
+      next: (response) => {
+        console.log('✅ API Test Success:', response);
+        alert('API connection successful! Check console for details.');
+      },
+      error: (error) => {
+        console.error('❌ API Test Failed:', error);
+        alert('API connection failed! Check console for details.');
+      }
+    });
+  }
   
   // Helper method to check if qualification field should be shown
   shouldShowQualification(): boolean {
@@ -319,7 +456,7 @@ export class RegistrationComponent {
     return today.toISOString().split('T')[0];
   }
 
-  // When date is selected, show time slot modal
+  // When date is selected, show time slot modal with available slots
   onDateSelected(): void {
     if (this.formData.appointmentDate) {
       const date = new Date(this.formData.appointmentDate);
@@ -329,8 +466,55 @@ export class RegistrationComponent {
         day: 'numeric', 
         year: 'numeric' 
       });
+      
+      // Load available slots from calendar
+      this.loadAvailableSlots(this.formData.appointmentDate);
       this.showTimeSlotModal = true;
     }
+  }
+
+  // Load available time slots from the consultant's calendar
+  private loadAvailableSlots(date: string): void {
+    this.isLoadingSlots = true;
+    
+    this.calendarService.getAvailableSlots(date).subscribe({
+      next: (slots: any[]) => {
+        // Update time slots with only available ones
+        if (slots && slots.length > 0) {
+          this.timeSlots = slots
+            .filter(slot => slot.available)
+            .map(slot => slot.time);
+        } else {
+          // Fallback to default slots if API doesn't return any
+          this.timeSlots = [
+            '9:00am - 10:00am',
+            '10:00am - 11:00am',
+            '11:00am - 12:00pm',
+            '1:00pm - 2:00pm',
+            '2:00pm - 3:00pm',
+            '3:00pm - 4:00pm',
+            '4:00pm - 5:00pm'
+          ];
+        }
+        this.isLoadingSlots = false;
+        this.cdr.detectChanges();
+      },
+      error: (error: any) => {
+        console.error('Error loading available slots:', error);
+        // Use default slots on error
+        this.timeSlots = [
+          '9:00am - 10:00am',
+          '10:00am - 11:00am',
+          '11:00am - 12:00pm',
+          '1:00pm - 2:00pm',
+          '2:00pm - 3:00pm',
+          '3:00pm - 4:00pm',
+          '4:00pm - 5:00pm'
+        ];
+        this.isLoadingSlots = false;
+        this.cdr.detectChanges();
+      }
+    });
   }
 
   // Select a time slot

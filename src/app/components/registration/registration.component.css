@@ -727,3 +727,228 @@
     font-size: 20px;
   }
 }
+/* Notification status styling */
+.application-id pre {
+  background-color: #e8f5e8;
+  border: 2px solid #4caf50;
+  border-radius: 8px;
+  padding: 16px;
+  color: #2e7d32;
+  font-weight: 600;
+  margin-top: 15px;
+  white-space: pre-line;
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+/* Loading indicator for time slots */
+.loading-slots {
+  text-align: center;
+  padding: 20px;
+  color: #666;
+  font-style: italic;
+}
+
+.loading-slots::after {
+  content: '...';
+  animation: dots 1.5s steps(5, end) infinite;
+}
+
+@keyframes dots {
+  0%, 20% {
+    color: rgba(0,0,0,0);
+    text-shadow:
+      .25em 0 0 rgba(0,0,0,0),
+      .5em 0 0 rgba(0,0,0,0);
+  }
+  40% {
+    color: #666;
+    text-shadow:
+      .25em 0 0 rgba(0,0,0,0),
+      .5em 0 0 rgba(0,0,0,0);
+  }
+  60% {
+    text-shadow:
+      .25em 0 0 #666,
+      .5em 0 0 rgba(0,0,0,0);
+  }
+  80%, 100% {
+    text-shadow:
+      .25em 0 0 #666,
+      .5em 0 0 #666;
+  }
+}
+
+/* Enhanced time slot cards */
+.time-slot-card {
+  position: relative;
+  padding: 20px;
+  border: 2px solid #e1e5e9;
+  border-radius: 12px;
+  background-color: #fafbfc;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.time-slot-card.unavailable {
+  background-color: #f5f5f5;
+  color: #999;
+  border-color: #ddd;
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.time-slot-card.unavailable::after {
+  content: '(Unavailable)';
+  display: block;
+  font-size: 12px;
+  color: #999;
+  margin-top: 4px;
+}
+
+.time-slot-card:not(.unavailable):hover {
+  border-color: #4285f4;
+  background-color: #f0f7ff;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(66, 133, 244, 0.2);
+}
+
+/* Notification icons in success message */
+.success-message .application-id pre {
+  text-align: left;
+}
+
+/* Mobile responsive for notification messages */
+@media (max-width: 768px) {
+  .application-id pre {
+    padding: 12px;
+    font-size: 13px;
+  }
+  
+  .loading-slots {
+    padding: 16px;
+    font-size: 14px;
+  }
+}
+/* No slots available message */
+.no-slots-message {
+  text-align: center;
+  padding: 30px 20px;
+  color: #666;
+}
+
+.no-slots-message p {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.5;
+}
+
+/* Enhanced modal for better UX */
+.time-slots-container {
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.time-slots-container:empty::after {
+  content: 'Loading time slots...';
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #666;
+  font-style: italic;
+}
+
+/* Better spacing for mobile */
+@media (max-width: 768px) {
+  .no-slots-message {
+    padding: 20px 16px;
+  }
+  
+  .no-slots-message p {
+    font-size: 15px;
+  }
+}
+/* Acknowledgement Section Styles - Compact & Professional */
+.acknowledgement-section {
+  margin: 20px 0;
+  padding: 16px;
+  background: #f8f9fa;
+  border-radius: 8px;
+  border: 1px solid #e1e5e9;
+}
+
+.acknowledgement-section h4 {
+  margin: 0 0 12px 0;
+  color: #333;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.checkbox-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.checkbox-item input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  cursor: pointer;
+  accent-color: #4285f4;
+}
+
+.checkbox-label {
+  cursor: pointer;
+  font-size: 14px;
+  color: #333;
+  margin: 0;
+  font-weight: normal;
+}
+
+/* Hover effects */
+.checkbox-item:hover .checkbox-label {
+  color: #4285f4;
+}
+
+.checkbox-item input[type="checkbox"]:checked + .checkbox-label {
+  color: #4285f4;
+  font-weight: 500;
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .acknowledgement-section {
+    margin: 16px 0;
+    padding: 14px;
+  }
+  
+  .acknowledgement-section h4 {
+    font-size: 15px;
+    margin-bottom: 10px;
+  }
+  
+  .checkbox-label {
+    font-size: 13px;
+  }
+}
+
+/* Focus states for accessibility */
+.checkbox-item input[type="checkbox"]:focus {
+  outline: 2px solid #4285f4;
+  outline-offset: 2px;
+}

@@ -1,36 +1,61 @@
 <div class="registration-container">
   <!-- Success Screen -->
-  <div class="success-screen" *ngIf="showSuccessScreen">
+  <div class="success-screen" *ngIf="showSuccessScreen || alreadySubmitted">
     <div class="success-content">
-      <div class="success-icon">
+      <!-- Close button for success screen -->
+      <button class="close-success-btn" (click)="closeSuccessScreen()" *ngIf="submitSuccess">×</button>
+      
+      <div class="success-icon" *ngIf="submitSuccess">
         <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
           <circle cx="12" cy="12" r="10" fill="#4CAF50"/>
           <path d="M9 12l2 2 4-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
         </svg>
       </div>
       
-      <h1>Form Submitted Successfully!</h1>
-      
-      <div class="success-message">
-        <p>Thank you for your registration. Your application has been received and is being processed.</p>
-        <p class="application-id" *ngIf="submitMessage">{{submitMessage}}</p>
+      <div class="error-icon" *ngIf="!submitSuccess">
+        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="12" cy="12" r="10" fill="#f44336"/>
+          <path d="M15 9l-6 6M9 9l6 6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </div>
       
-      <div class="contact-info">
+      <h1 *ngIf="submitSuccess && !alreadySubmitted">Form Submitted Successfully!</h1>
+      <h1 *ngIf="alreadySubmitted || (!submitSuccess && submitMessage.includes('already registered'))">Already Registered!</h1>
+      <h1 *ngIf="!submitSuccess && !submitMessage.includes('already registered')">Registration Failed</h1>
+      
+      <div class="success-message" *ngIf="submitSuccess">
+        <p *ngIf="!alreadySubmitted">Thank you for your registration. Your application has been received and is being processed.</p>
+        <p *ngIf="alreadySubmitted">You have already submitted your registration with this email address.</p>
+        <div class="application-id" *ngIf="submitMessage">
+          <pre>{{submitMessage}}</pre>
+        </div>
+      </div>
+      
+      <div class="error-message" *ngIf="!submitSuccess">
+        <p>{{submitMessage}}</p>
+        <button class="retry-btn" (click)="goBackToForm()">Try Again</button>
+      </div>
+      
+      <div class="contact-info" *ngIf="submitSuccess">
         <p>For any changes or queries, please contact:</p>
         <p class="email-contact">
           <strong>📧 kncci@example.com</strong>
         </p>
       </div>
       
-      <div class="processing-info">
+      <div class="processing-info" *ngIf="submitSuccess">
         <p class="tat-info">⏱️ Processing time: 3-5 business days</p>
+      </div>
+
+      <!-- Action buttons for successful submission -->
+      <div class="success-actions" *ngIf="submitSuccess">
+        <button class="new-registration-btn" (click)="startNewRegistration()">New Registration</button>
       </div>
     </div>
   </div>
 
   <!-- Registration Form -->
-  <div class="registration-form" *ngIf="!showSuccessScreen && !alreadySubmitted">
+  <div class="registration-form" *ngIf="!showSuccessScreen">
     <div class="header">
       <div class="logo">
         <img src="assets/images/image.png" alt="KNNCI Logo" class="logo-img">
@@ -62,9 +87,20 @@
           id="email" 
           name="email"
           [(ngModel)]="formData.email"
+          (input)="onEmailChange()"
           required
           placeholder="Enter your email address"
+          [class.error-input]="alreadySubmitted"
         >
+        <div class="email-check-status" *ngIf="isCheckingExisting">
+          <small>⏳ Checking existing registrations...</small>
+        </div>
+        <div class="email-exists-warning" *ngIf="alreadySubmitted && !showSuccessScreen">
+          <small>❌ This email is already registered! Please use a different email.</small>
+        </div>
+        <div class="email-available" *ngIf="!alreadySubmitted && !isCheckingExisting && formData.email && formData.email.includes('@')">
+          <small>✅ Email is available</small>
+        </div>
       </div>
 
       <div class="form-group">
@@ -150,15 +186,35 @@
         </div>
       </div>
 
-      <div class="form-group">
-        <label for="address">Address (Optional)</label>
-        <textarea 
-          id="address" 
-          name="address"
-          [(ngModel)]="formData.address"
-          placeholder="Enter your address"
-          rows="3"
-        ></textarea>
+      <!-- Acknowledgement Preferences -->
+      <div class="acknowledgement-section">
+        <h4>Notifications</h4>
+        
+        <div class="checkbox-group">
+          <div class="checkbox-item">
+            <input 
+              type="checkbox" 
+              id="emailAcknowledgement" 
+              name="emailAcknowledgement"
+              [(ngModel)]="formData.emailAcknowledgement"
+            >
+            <label for="emailAcknowledgement" class="checkbox-label">
+              📧 Email confirmations
+            </label>
+          </div>
+          
+          <div class="checkbox-item">
+            <input 
+              type="checkbox" 
+              id="whatsappAcknowledgement" 
+              name="whatsappAcknowledgement"
+              [(ngModel)]="formData.whatsappAcknowledgement"
+            >
+            <label for="whatsappAcknowledgement" class="checkbox-label">
+              📱 WhatsApp notifications
+            </label>
+          </div>
+        </div>
       </div>
 
       <!-- Submission Status Messages -->
@@ -173,10 +229,20 @@
       <button 
         type="submit" 
         class="submit-btn" 
-        [disabled]="!registrationForm.form.valid || isSubmitting"
+        [disabled]="!registrationForm.form.valid || isSubmitting || alreadySubmitted"
       >
         <span *ngIf="isSubmitting">Submitting...</span>
-        <span *ngIf="!isSubmitting">Submit Registration</span>
+        <span *ngIf="!isSubmitting && !alreadySubmitted">Submit Registration</span>
+        <span *ngIf="!isSubmitting && alreadySubmitted">Email Already Registered</span>
+      </button>
+
+      <!-- Debug button to test API connection -->
+      <button 
+        type="button" 
+        (click)="testApiConnection()"
+        style="margin-top: 10px; background: #ff5722; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 12px;"
+      >
+        🧪 Test API Connection
       </button>
     </form>
   </div>
@@ -194,12 +260,21 @@
     </div>
     
     <div class="time-slots-container">
+      <div class="loading-slots" *ngIf="isLoadingSlots">
+        Loading available time slots
+      </div>
+      
       <div 
         class="time-slot-card" 
         *ngFor="let slot of timeSlots"
         (click)="selectTimeSlot(slot)"
+        [class.unavailable]="false"
       >
         {{slot}}
+      </div>
+      
+      <div class="no-slots-message" *ngIf="!isLoadingSlots && timeSlots.length === 0">
+        <p>No available time slots for this date. Please select a different date.</p>
       </div>
     </div>
   </div>
