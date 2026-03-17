@@ -19,7 +19,7 @@
       <!-- Name -->
       <div class="form-group">
         <label>Name *</label>
-        <input type="text" name="name" [(ngModel)]="formData.name" required>
+        <input type="text" name="name" [(ngModel)]="formData.name" required placeholder="Enter your full name">
       </div>
 
       <!-- Email -->
@@ -30,6 +30,7 @@
           name="email"
           [(ngModel)]="formData.email"
           (input)="onEmailChange()"
+          placeholder="Enter your email address"
           required
           [class.error-input]="alreadySubmitted && formData.email.includes('@')"
         >
@@ -50,14 +51,14 @@
       <!-- Mobile -->
       <div class="form-group">
         <label>Mobile *</label>
-        <input type="tel" name="mobile" [(ngModel)]="formData.mobile" required>
+        <input type="tel" name="mobile" [(ngModel)]="formData.mobile" required placeholder="Enter your mobile number">
       </div>
 
       <!-- Role -->
       <div class="form-group">
         <label>I am a *</label>
         <select name="role" [(ngModel)]="formData.role" required>
-          <option value="">Select</option>
+          <option value="">Select an option</option>
           <option *ngFor="let role of roleOptions" [value]="role">{{role}}</option>
         </select>
       </div>
@@ -66,7 +67,7 @@
       <div class="form-group" *ngIf="shouldShowQualification()">
         <label>Qualification *</label>
         <select name="qualification" [(ngModel)]="formData.qualification">
-          <option value="">Select</option>
+          <option value="">Select your qualification</option>
           <option *ngFor="let q of qualificationOptions" [value]="q">{{q}}</option>
         </select>
       </div>
@@ -74,7 +75,7 @@
       <!-- Company -->
       <div class="form-group" *ngIf="shouldShowCompany()">
         <label>Company *</label>
-        <input type="text" name="company" [(ngModel)]="formData.company">
+        <input type="text" name="company" [(ngModel)]="formData.company" placeholder="Enter your company name" required>
       </div>
 
       <!-- DOB -->
@@ -86,7 +87,7 @@
       <!-- Address -->
       <div class="form-group">
         <label>Address *</label>
-        <textarea name="address" [(ngModel)]="formData.address" required></textarea>
+        <textarea name="address" [(ngModel)]="formData.address" required placeholder="Enter your address"></textarea>
       </div>
 
       <!-- Appointment Date -->
