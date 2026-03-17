@@ -1,61 +1,8 @@
 <div class="registration-container">
-  <!-- Success Screen -->
-  <div class="success-screen" *ngIf="showSuccessScreen || alreadySubmitted">
-    <div class="success-content">
-      <!-- Close button for success screen -->
-      <button class="close-success-btn" (click)="closeSuccessScreen()" *ngIf="submitSuccess">×</button>
-      
-      <div class="success-icon" *ngIf="submitSuccess">
-        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" r="10" fill="#4CAF50"/>
-          <path d="M9 12l2 2 4-4" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      
-      <div class="error-icon" *ngIf="!submitSuccess">
-        <svg width="80" height="80" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-          <circle cx="12" cy="12" r="10" fill="#f44336"/>
-          <path d="M15 9l-6 6M9 9l6 6" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-        </svg>
-      </div>
-      
-      <h1 *ngIf="submitSuccess && !alreadySubmitted">Form Submitted Successfully!</h1>
-      <h1 *ngIf="alreadySubmitted || (!submitSuccess && submitMessage.includes('already registered'))">Already Registered!</h1>
-      <h1 *ngIf="!submitSuccess && !submitMessage.includes('already registered')">Registration Failed</h1>
-      
-      <div class="success-message" *ngIf="submitSuccess">
-        <p *ngIf="!alreadySubmitted">Thank you for your registration. Your application has been received and is being processed.</p>
-        <p *ngIf="alreadySubmitted">You have already submitted your registration with this email address.</p>
-        <div class="application-id" *ngIf="submitMessage">
-          <pre>{{submitMessage}}</pre>
-        </div>
-      </div>
-      
-      <div class="error-message" *ngIf="!submitSuccess">
-        <p>{{submitMessage}}</p>
-        <button class="retry-btn" (click)="goBackToForm()">Try Again</button>
-      </div>
-      
-      <div class="contact-info" *ngIf="submitSuccess">
-        <p>For any changes or queries, please contact:</p>
-        <p class="email-contact">
-          <strong>📧 kncci@example.com</strong>
-        </p>
-      </div>
-      
-      <div class="processing-info" *ngIf="submitSuccess">
-        <p class="tat-info">⏱️ Processing time: 3-5 business days</p>
-      </div>
 
-      <!-- Action buttons for successful submission -->
-      <div class="success-actions" *ngIf="submitSuccess">
-        <button class="new-registration-btn" (click)="startNewRegistration()">New Registration</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Registration Form -->
-  <div class="registration-form" *ngIf="!showSuccessScreen">
+  <!-- ================= FORM ================= -->
+  <div class="registration-form" *ngIf="!submitSuccess">
+    
     <div class="header">
       <div class="logo">
         <img src="assets/images/image.png" alt="KNNCI Logo" class="logo-img">
@@ -68,109 +15,85 @@
     </div>
 
     <form (ngSubmit)="onSubmit()" #registrationForm="ngForm">
+
+      <!-- Name -->
       <div class="form-group">
-        <label for="name">Name *</label>
-        <input 
-          type="text" 
-          id="name" 
-          name="name"
-          [(ngModel)]="formData.name"
-          required
-          placeholder="Enter your full name"
-        >
+        <label>Name *</label>
+        <input type="text" name="name" [(ngModel)]="formData.name" required>
       </div>
 
+      <!-- Email -->
       <div class="form-group">
-        <label for="email">Email *</label>
+        <label>Email *</label>
         <input 
-          type="email" 
-          id="email" 
+          type="email"
           name="email"
           [(ngModel)]="formData.email"
           (input)="onEmailChange()"
           required
-          placeholder="Enter your email address"
-          [class.error-input]="alreadySubmitted"
+          [class.error-input]="alreadySubmitted && formData.email.includes('@')"
         >
-        <div class="email-check-status" *ngIf="isCheckingExisting">
-          <small>⏳ Checking existing registrations...</small>
+
+        <div *ngIf="isCheckingExisting">
+          <small>⏳ Checking...</small>
         </div>
-        <div class="email-exists-warning" *ngIf="alreadySubmitted && !showSuccessScreen">
-          <small>❌ This email is already registered! Please use a different email.</small>
+
+        <div *ngIf="alreadySubmitted && formData.email.includes('@')">
+          <small style="color:red;">❌ Email already registered</small>
         </div>
-        <div class="email-available" *ngIf="!alreadySubmitted && !isCheckingExisting && formData.email && formData.email.includes('@')">
-          <small>✅ Email is available</small>
+
+        <div *ngIf="!alreadySubmitted && !isCheckingExisting && formData.email.includes('@')">
+          <small style="color:green;">✅ Email available</small>
         </div>
       </div>
 
+      <!-- Mobile -->
       <div class="form-group">
-        <label for="mobile">Mobile Number *</label>
-        <input 
-          type="tel" 
-          id="mobile" 
-          name="mobile"
-          [(ngModel)]="formData.mobile"
-          required
-          placeholder="Enter your mobile number"
-        >
+        <label>Mobile *</label>
+        <input type="tel" name="mobile" [(ngModel)]="formData.mobile" required>
       </div>
 
+      <!-- Role -->
       <div class="form-group">
-        <label for="role">I am a *</label>
-        <select 
-          id="role" 
-          name="role"
-          [(ngModel)]="formData.role"
-          required
-        >
-          <option value="">Select an option</option>
+        <label>I am a *</label>
+        <select name="role" [(ngModel)]="formData.role" required>
+          <option value="">Select</option>
           <option *ngFor="let role of roleOptions" [value]="role">{{role}}</option>
         </select>
       </div>
 
-      <!-- Show qualification dropdown only for Students -->
+      <!-- Qualification -->
       <div class="form-group" *ngIf="shouldShowQualification()">
-        <label for="qualification">Highest Qualification *</label>
-        <select 
-          id="qualification" 
-          name="qualification"
-          [(ngModel)]="formData.qualification"
-          [required]="shouldShowQualification()"
-        >
-          <option value="">Select your qualification</option>
-          <option *ngFor="let qual of qualificationOptions" [value]="qual">{{qual}}</option>
+        <label>Qualification *</label>
+        <select name="qualification" [(ngModel)]="formData.qualification">
+          <option value="">Select</option>
+          <option *ngFor="let q of qualificationOptions" [value]="q">{{q}}</option>
         </select>
       </div>
 
-      <!-- Show company field only for Employees -->
+      <!-- Company -->
       <div class="form-group" *ngIf="shouldShowCompany()">
-        <label for="company">Company Name *</label>
-        <input 
-          type="text" 
-          id="company" 
-          name="company"
-          [(ngModel)]="formData.company"
-          [required]="shouldShowCompany()"
-          placeholder="Enter your company name"
-        >
+        <label>Company *</label>
+        <input type="text" name="company" [(ngModel)]="formData.company">
       </div>
 
+      <!-- DOB -->
       <div class="form-group">
-        <label for="dateOfBirth">Date of Birth *</label>
-        <input 
-          type="date" 
-          id="dateOfBirth" 
-          name="dateOfBirth"
-          [(ngModel)]="formData.dateOfBirth"
-          required
-        >
+        <label>Date of Birth *</label>
+        <input type="date" name="dateOfBirth" [(ngModel)]="formData.dateOfBirth" required>
       </div>
 
+      <!-- Address -->
       <div class="form-group">
-        <label for="appointmentDate">Select Appointment Date *</label>
+        <label>Address *</label>
+        <textarea name="address" [(ngModel)]="formData.address" required></textarea>
+      </div>
+
+      <!-- Appointment Date -->
+      <div class="form-group">
+        <label>Appointment Date *</label>
         <input 
-          type="date" 
-          id="appointmentDate" 
+          type="date"
           name="appointmentDate"
           [(ngModel)]="formData.appointmentDate"
           [min]="getMinDate()"
@@ -179,103 +102,107 @@
         >
       </div>
 
+      <!-- Selected Slot -->
       <div class="form-group" *ngIf="formData.appointmentSlot">
-        <label>Selected Appointment Slot</label>
+        <label>Selected Slot</label>
         <div class="selected-slot">
           {{formData.appointmentSlot}}
         </div>
       </div>
 
-      <!-- Acknowledgement Preferences -->
-      <div class="acknowledgement-section">
-        <h4>Notifications</h4>
-        
-        <div class="checkbox-group">
-          <div class="checkbox-item">
-            <input 
-              type="checkbox" 
-              id="emailAcknowledgement" 
-              name="emailAcknowledgement"
-              [(ngModel)]="formData.emailAcknowledgement"
-            >
-            <label for="emailAcknowledgement" class="checkbox-label">
-              📧 Email confirmations
-            </label>
-          </div>
-          
-          <div class="checkbox-item">
-            <input 
-              type="checkbox" 
-              id="whatsappAcknowledgement" 
-              name="whatsappAcknowledgement"
-              [(ngModel)]="formData.whatsappAcknowledgement"
-            >
-            <label for="whatsappAcknowledgement" class="checkbox-label">
-              📱 WhatsApp notifications
-            </label>
-          </div>
-        </div>
-      </div>
-
-      <!-- Submission Status Messages -->
-      <div class="alert alert-success" *ngIf="submitSuccess && submitMessage">
-        {{submitMessage}}
-      </div>
-      
+      <!-- Error Message -->
       <div class="alert alert-error" *ngIf="!submitSuccess && submitMessage">
         {{submitMessage}}
       </div>
 
+      <!-- Submit Button -->
       <button 
-        type="submit" 
-        class="submit-btn" 
+        type="submit"
+        class="submit-btn"
         [disabled]="!registrationForm.form.valid || isSubmitting || alreadySubmitted"
       >
         <span *ngIf="isSubmitting">Submitting...</span>
         <span *ngIf="!isSubmitting && !alreadySubmitted">Submit Registration</span>
-        <span *ngIf="!isSubmitting && alreadySubmitted">Email Already Registered</span>
+        <span *ngIf="!isSubmitting && alreadySubmitted">Change Email</span>
       </button>
 
-      <!-- Debug button to test API connection -->
-      <button 
-        type="button" 
-        (click)="testApiConnection()"
-        style="margin-top: 10px; background: #ff5722; color: white; border: none; padding: 8px 16px; border-radius: 4px; cursor: pointer; font-size: 12px;"
-      >
-        🧪 Test API Connection
-      </button>
     </form>
+  </div>
+
+  <!-- ================= SUCCESS SCREEN ================= -->
+  <!-- ================= SUCCESS SCREEN ================= -->
+<div class="success-screen" *ngIf="submitSuccess">
+  <div class="success-card">
+
+    <!-- Green Tick -->
+    <div class="success-icon">✓</div>
+
+    <!-- Title -->
+    <h2>Form Submitted Successfully!</h2>
+
+    <!-- Description -->
+    <p class="success-subtext">
+      Thank you for your registration. Your application has been received and is being processed.
+    </p>
+
+    <!-- Message Box -->
+    <div class="success-message-box">
+      {{ submitMessage }}
+    </div>
+
+    <!-- Contact Section -->
+    <div class="contact-box">
+      <p>For any changes or queries, please contact:</p>
+      <p class="email">📧 kncci@example.com</p>
+    </div>
+
+    <!-- Processing Time -->
+    <div class="processing-time">
+      ⏱ Processing time: 3-5 business days
+    </div>
+
+    <!-- Button -->
+    <!-- <button class="submit-btn" (click)="resetForm()">
+      Submit Another Response
+    </button> -->
+
   </div>
 </div>
 
-<!-- Time Slot Selection Modal -->
+</div>
+
+
+<!-- ================= TIME SLOT MODAL ================= -->
 <div class="modal-overlay" *ngIf="showTimeSlotModal" (click)="closeTimeSlotModal()">
   <div class="time-slot-modal" (click)="$event.stopPropagation()">
+
     <div class="modal-header">
       <button class="close-btn" (click)="closeTimeSlotModal()">×</button>
-      <div class="back-btn" (click)="closeTimeSlotModal()">
-        <span>←</span>
-      </div>
-      <h3>Available Time Slots for {{selectedDateFormatted}}</h3>
+      <h3>Available Slots - {{selectedDateFormatted}}</h3>
     </div>
-    
+
     <div class="time-slots-container">
-      <div class="loading-slots" *ngIf="isLoadingSlots">
-        Loading available time slots
+
+      <!-- Loading -->
+      <div *ngIf="isLoadingSlots">
+        <p>Loading slots...</p>
       </div>
-      
+
+      <!-- Slots -->
       <div 
-        class="time-slot-card" 
+        class="time-slot-card"
         *ngFor="let slot of timeSlots"
         (click)="selectTimeSlot(slot)"
-        [class.unavailable]="false"
       >
         {{slot}}
       </div>
-      
-      <div class="no-slots-message" *ngIf="!isLoadingSlots && timeSlots.length === 0">
-        <p>No available time slots for this date. Please select a different date.</p>
+
+      <!-- No Slots -->
+      <div *ngIf="!isLoadingSlots && timeSlots.length === 0">
+        <p>No slots available</p>
       </div>
+
     </div>
+
   </div>
 </div>

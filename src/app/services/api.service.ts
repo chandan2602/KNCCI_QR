@@ -9,13 +9,12 @@ export interface RegistrationRequest {
   email: string;
   mobile: string;
   user_type: string;
-  company_name: string | null;
-  qualification: string | null;
+  company_name?: string | null;
+  qualification?: string | null;
   date_of_birth: string;
   appointment_date: string;
   slot: string;
-  email_acknowledgement: boolean;
-  whatsapp_acknowledgement: boolean;
+  address: string;
 }
 
 export interface RegistrationResponse {
@@ -40,6 +39,26 @@ export interface NotificationRequest {
   create_calendar_event?: boolean;
 }
 
+export interface TimeSlotResponse {
+  appointment_date: string;
+  available_slots: AvailableSlot[];
+  total_slots_available: number;
+}
+
+export interface AvailableSlot {
+  time_slot: string;
+  total_available_capacity: number;
+  counselors_available: number;
+  counselors: Counselor[];
+}
+
+export interface Counselor {
+  counselor_id: number;
+  counselor_name: string;
+  available_capacity: number;
+  slot_id: number;
+}
+
 export interface CalendarIntegrationRequest {
   application_id: number;
   attendee_email: string;
@@ -54,32 +73,44 @@ export interface CalendarIntegrationRequest {
 })
 export class ApiService {
   private readonly baseUrl = environment.apiUrl;
-  private readonly timeout = 30000; // 30 seconds
-  private readonly maxRetries = 3;
+  private readonly timeout = 10000; // 10 seconds for dynamic slots
+  private readonly maxRetries = 1; // One retry for dynamic slots
+  private readonly slotCacheTimeout = 30000; // 30 seconds cache for slots
+
+  // Cache for slot data to avoid repeated API calls
+  private slotCache = new Map<string, { data: TimeSlotResponse; timestamp: number }>();
 
   constructor(private http: HttpClient) {}
 
-  // Register a new user with notifications and calendar integration
+  // Register a new user with instant response
   register(data: RegistrationRequest): Observable<RegistrationResponse> {
-    const url = `${this.baseUrl}/api/register`;
+    const url = `${this.baseUrl}/api/register`; // baseUrl already includes /KNCCI
     
     console.log('🚀 Making API call to:', url);
     console.log('📤 Request payload:', data);
     
-    // Send registration data directly to your backend
-    const registrationPayload = {
+    // Send registration data to match your exact backend format
+    const registrationPayload: any = {
       name: data.name,
       email: data.email,
       mobile: data.mobile,
       user_type: data.user_type,
-      company_name: data.company_name,
-      qualification: data.qualification,
       date_of_birth: data.date_of_birth,
       appointment_date: data.appointment_date,
       slot: data.slot,
-      email_acknowledgement: data.email_acknowledgement,
-      whatsapp_acknowledgement: data.whatsapp_acknowledgement
+      address: data.address
     };
+    
+    // Add optional fields only if they have values
+    if (data.qualification) {
+      registrationPayload.qualification = data.qualification;
+    }
+    
+    if (data.company_name) {
+      registrationPayload.company_name = data.company_name;
+    }
+    
+    console.log('🎯 Final payload being sent:', JSON.stringify(registrationPayload, null, 2));
     
     return this.http.post<any>(url, registrationPayload, {
       headers: {
@@ -120,13 +151,10 @@ export class ApiService {
         console.log('✅ Transformed response:', transformedResponse);
         return transformedResponse;
       }),
+      // Single retry for production speed
       retry({
         count: this.maxRetries,
-        delay: (error, retryCount) => {
-          const delayMs = Math.pow(2, retryCount) * 1000;
-          console.log(`🔄 Retrying API call in ${delayMs}ms (attempt ${retryCount + 1})`);
-          return timer(delayMs);
-        }
+        delay: 1000 // 1 second delay between retries
       }),
       catchError((error) => {
         console.error('💥 API Error in service:', error);
@@ -142,6 +170,40 @@ export class ApiService {
     return this.http.get<any[]>(url).pipe(
       timeout(this.timeout),
       retry(2), // Fewer retries for read operations
+      catchError(this.handleError)
+    );
+  }
+
+  // Get available time slots for a specific date with caching
+  getAvailableSlots(appointmentDate: string): Observable<TimeSlotResponse> {
+    const url = `${this.baseUrl}/api/counselors/available-slots`;
+    
+    // Check cache first for instant response
+    const cached = this.slotCache.get(appointmentDate);
+    if (cached && (Date.now() - cached.timestamp) < this.slotCacheTimeout) {
+      console.log('🚀 Returning cached slots for', appointmentDate);
+      return new Observable(observer => {
+        observer.next(cached.data);
+        observer.complete();
+      });
+    }
+    
+    return this.http.get<TimeSlotResponse>(url, {
+      params: { appointment_date: appointmentDate },
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    }).pipe(
+      timeout(this.timeout),
+      retry(this.maxRetries),
+      map(response => {
+        // Cache the response
+        this.slotCache.set(appointmentDate, {
+          data: response,
+          timestamp: Date.now()
+        });
+        return response;
+      }),
       catchError(this.handleError)
     );
   }
@@ -187,22 +249,6 @@ export class ApiService {
     const url = `${this.baseUrl}/api/calendar/create-event`;
     
     return this.http.post(url, data, {
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    }).pipe(
-      timeout(this.timeout),
-      retry(2),
-      catchError(this.handleError)
-    );
-  }
-
-  // Get available calendar slots from the consultant's calendar
-  getAvailableSlots(date: string): Observable<string[]> {
-    const url = `${this.baseUrl}/api/calendar/available-slots`;
-    
-    return this.http.get<string[]>(url, {
-      params: { date },
       headers: {
         'Content-Type': 'application/json'
       }
